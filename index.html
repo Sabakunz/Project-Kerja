@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gastra Attendance - Flexible Shifts</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#22c55e', 600: '#16a34a', 700: '#15803d' },
+                        surface: { 50: '#f8fafc', 100: '#f1f5f9' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { scroll-behavior: smooth; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: #f8fafc;
+            color: #334155;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .input-field { transition: border-color 0.2s, box-shadow 0.2s; }
+        .input-field:focus { outline: none; border-color: #16a34a; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15); }
+        .btn-primary { background: #16a34a; color: white; transition: background 0.2s, transform 0.1s; }
+        .btn-primary:hover { background: #15803d; }
+        .btn-primary:active { transform: scale(0.99); }
+        .btn-primary:disabled { background: #cbd5e1; color: #94a3b8; cursor: not-allowed; transform: none; }
+        .btn-shift { transition: all 0.2s; border: 1px solid #e2e8f0; background: #ffffff; }
+        .btn-shift:hover { border-color: #22c55e; background: #f0fdf4; }
+        .btn-shift.active { background: #16a34a; color: white; border-color: #16a34a; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2); }
+        #photo-preview { object-fit: cover; width: 100%; height: 100%; border-radius: 1rem; }
+        .status-badge { transition: all 0.3s; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        .scrollbar-light::-webkit-scrollbar { width: 4px; }
+        .scrollbar-light::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 2px; }
+        .scrollbar-light::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .modal-enter { animation: modalIn 0.25s ease forwards; }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .animate-pulse-slow { animation: pulse-slow 2s ease-in-out infinite; }
+        @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    </style>
+</head>
+<body class="p-4 md:p-6 min-h-screen">
+    <div id="app" class="max-w-5xl mx-auto">
+        <header class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center shadow-sm">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-semibold text-slate-800">KONTROL PEMAKAIAN <span class="text-primary-600">TOOLS</span></h1>
+                    <p class="text-slate-500 text-sm">Monitoring Penggunaan Cutting Tools</p>
+                </div>
+            </div>
+            <!-- Added Status Badge to fix JS reference -->
+            <div id="status-badge" class="status-badge px-4 py-2 rounded-lg bg-slate-100 text-slate-500 border border-slate-200">System Ready</div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <section class="lg:col-span-7 space-y-5">
+                <div class="card p-6">
+                    <div class="mb-6">
+                        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Pilih Insert/ Tools</label>
+                        <select id="emp-select" class="input-field w-full p-3 rounded-lg border border-slate-200 bg-white text-slate-700 font-medium appearance-none cursor-pointer">
+                            <option value="">-- Pilih Insert/ Tools --</option>
+                
+                        </select>
+                      
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Jumlah Stok Masuk</label>
+                            <input id="stock-qty" type="number" min="1" value="1" class="input-field w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Produk</label>
+                            <input id="product-name" type="text" placeholder="Contoh: HKOJ" class="input-field w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Mesin</label>
+                            <input id="machine-name" type="text" placeholder="Contoh: CNC Yamazaki" class="input-field w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm">
+                        </div>
+                         <div class="md:col-span-2">
+                            <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">PIC</label>
+                            <input id="pic-name" type="text" placeholder="" class="input-field w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm">
+                        </div>
+                          <div class="md:col-span-2">
+                            <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Keterangan</label>
+                            <input id="description" type="text" placeholder="" class="input-field w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm">
+                        </div>
+                    </div>
+
+                    <!-- Hidden container for Shift (required by your JS) -->
+                    <div id="shift-container" class="hidden"></div>
+
+                    <div class="mb-6">
+                        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Foto Tools Bekas</label>
+                        <input type="file" id="camera-input" accept="image/*" capture="user" class="hidden">
+                        <div id="photo-area" class="relative cursor-pointer rounded-lg bg-slate-50 aspect-video border-2 border-dashed border-slate-300 flex flex-col items-center justify-center hover:border-primary-500 hover:bg-primary-50/30 transition-all duration-200">
+                            <img id="photo-preview" class="hidden" alt="Preview">
+                            <div id="camera-placeholder" class="text-center">
+                                <div class="w-16 h-16 mx-auto mb-3 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+                                    <svg class="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    </svg>
+                                </div>
+                                <p class="text-sm text-slate-500 font-medium">Ketuk untuk Ambil Foto</p>
+                            </div>
+                            <button id="btn-retake" class="hidden absolute bottom-4 right-4 bg-red-500 text-white px-4 py-1.5 rounded-lg text-xs font-medium">Ulangi</button>
+                        </div>
+                    </div>
+
+                    <button id="btn-submit" disabled class="btn-primary w-full py-3.5 rounded-lg font-semibold text-base flex items-center justify-center gap-2">
+                        <span>SUBMIT</span>
+                    </button>
+                    <p id="helper-text" class="text-xs text-slate-400 text-center mt-3">Pastikan tools bekas diletakkan di tempat yang disediakan.</p>
+                </div>
+            </section>
+
+            <section class="lg:col-span-5 space-y-5">
+                <div class="card p-5 bg-slate-800 text-white">
+                    <div class="flex items-center gap-2 mb-4">
+                        <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                        </svg>
+                        <h3 class="font-semibold">Top Users</h3>
+                    </div>
+                    <div id="top-list" class="space-y-3"></div>
+                </div>
+
+                <div class="card p-5 flex flex-col h-[460px]">
+                    <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                        <h3 class="font-semibold text-slate-700">Riwayat Terakhir</h3>
+                    </div>
+                    <div id="history-list" class="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-light"></div>
+                </div>
+            </section>
+        </div>
+
+        <footer class="mt-12 text-center text-slate-400 text-xs pb-4">
+            &copy; <span id="year"></span> Dharma Precision Parts • Developed by Sabiqun
+        </footer>
+    </div>
+
+    <canvas id="compress-canvas" class="hidden"></canvas>
+
+    <div id="modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="bg-white p-6 rounded-2xl max-w-sm w-full text-center shadow-2xl" id="modal-content">
+            <div id="modal-icon" class="text-5xl mb-4"></div>
+            <h2 id="modal-title" class="text-xl font-semibold text-slate-800 mb-2"></h2>
+            <p id="modal-desc" class="text-slate-500 mb-6 text-sm"></p>
+            <button onclick="closeModal()" class="btn-primary w-full py-3 rounded-xl font-medium">Selesai</button>
+        </div>
+    </div>
+
+    <script>
+        let CONFIG = {};
+        let CAPTURED_IMAGE = null;
+        let IS_SUBMITTING = false;
+        const isGAS = typeof google !== 'undefined' && google.script;
+
+        const els = {
+            cameraInput: document.getElementById('camera-input'),
+            photoArea: document.getElementById('photo-area'),
+            photoPreview: document.getElementById('photo-preview'),
+            cameraPlaceholder: document.getElementById('camera-placeholder'),
+            btnRetake: document.getElementById('btn-retake'),
+            btnSubmit: document.getElementById('btn-submit'),
+            empSelect: document.getElementById('emp-select'),
+            statusBadge: document.getElementById('status-badge'),
+            shiftContainer: document.getElementById('shift-container'),
+            historyList: document.getElementById('history-list'),
+            topList: document.getElementById('top-list'),
+            modal: document.getElementById('modal'),
+            modalContent: document.getElementById('modal-content'),
+            modalIcon: document.getElementById('modal-icon'),
+            modalTitle: document.getElementById('modal-title'),
+            modalDesc: document.getElementById('modal-desc'),
+            canvas: document.getElementById('compress-canvas')
+        };
+
+        window.onload = () => { 
+            document.getElementById('year').textContent = new Date().getFullYear();
+            loadInitialData(); 
+        };
+
+        els.photoArea.onclick = () => { if (!CAPTURED_IMAGE && !IS_SUBMITTING) els.cameraInput.click(); };
+        els.btnRetake.onclick = (e) => { e.stopPropagation(); resetPhoto(); els.cameraInput.click(); };
+
+        els.cameraInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const img = new Image();
+                img.onload = () => compressAndSetImage(img);
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+
+        function compressAndSetImage(img) {
+            const ctx = els.canvas.getContext('2d');
+            const MAX_WIDTH = 800;
+            const scale = Math.min(1, MAX_WIDTH / img.width);
+            els.canvas.width = img.width * scale;
+            els.canvas.height = img.height * scale;
+            ctx.drawImage(img, 0, 0, els.canvas.width, els.canvas.height);
+            CAPTURED_IMAGE = els.canvas.toDataURL('image/jpeg', 0.6);
+            els.photoPreview.src = CAPTURED_IMAGE;
+            els.photoPreview.classList.remove('hidden');
+            els.cameraPlaceholder.classList.add('hidden');
+            els.btnRetake.classList.remove('hidden');
+            checkValidation();
+        }
+
+        function resetPhoto() {
+            CAPTURED_IMAGE = null;
+            els.cameraInput.value = "";
+            els.photoPreview.classList.add('hidden');
+            els.cameraPlaceholder.classList.remove('hidden');
+            els.btnRetake.classList.add('hidden');
+            checkValidation();
+        }
+
+        function checkValidation() {
+            const isFormComplete = els.empSelect.value && CAPTURED_IMAGE && 
+                                  document.getElementById('product-name').value && 
+                                  document.getElementById('machine-name').value;
+            
+            els.btnSubmit.disabled = !isFormComplete || IS_SUBMITTING;
+            els.btnSubmit.innerHTML = IS_SUBMITTING ? `<span class="spinner"></span> MEMPROSES...` : `<span>SUBMIT</span>`;
+        }
+
+        // Listen for input changes to validate
+        ['emp-select', 'product-name', 'machine-name'].forEach(id => {
+            document.getElementById(id).addEventListener('input', checkValidation);
+        });
+
+        function loadInitialData() {
+            if (isGAS) {
+                google.script.run
+                    .withSuccessHandler(res => {
+                        CONFIG = JSON.parse(res);
+                        renderData();
+                    })
+                    .getInitialData();
+            } else {
+                CONFIG = { employees: ["Tools A", "Tools B"], history: [] };
+                renderData();
+            }
+        }
+
+        function renderData() {
+            els.empSelect.innerHTML = '<option value="">-- Pilih Tools --</option>';
+            (CONFIG.employees || []).forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = opt.textContent = name;
+                els.empSelect.appendChild(opt);
+            });
+            renderHistory(CONFIG.history || []);
+        }
+
+        function renderHistory(data) {
+            els.historyList.innerHTML = data.length ? "" : '<p class="text-xs text-slate-400 text-center py-8">Belum ada riwayat.</p>';
+        }
+
+        els.btnSubmit.onclick = async () => {
+            if (IS_SUBMITTING) return;
+            IS_SUBMITTING = true;
+            checkValidation();
+
+            const payload = {
+                name: els.empSelect.value,
+                product: document.getElementById('product-name').value,
+                machine: document.getElementById('machine-name').value,
+                qty: document.getElementById('stock-qty').value,
+                image: CAPTURED_IMAGE
+            };
+
+            if (isGAS) {
+                google.script.run
+                    .withSuccessHandler(res => {
+                        showModal("✅ Berhasil", "Data berhasil dikirim");
+                        resetForm();
+                        IS_SUBMITTING = false;
+                    })
+                    .submitAttendance(JSON.stringify(payload));
+            } else {
+                setTimeout(() => {
+                    showModal("✅ Berhasil", "Simulasi pengiriman berhasil");
+                    resetForm();
+                    IS_SUBMITTING = false;
+                }, 1000);
+            }
+        };
+
+        function resetForm() {
+            resetPhoto();
+            els.empSelect.value = "";
+            document.getElementById('product-name').value = "";
+            document.getElementById('machine-name').value = "";
+            checkValidation();
+        }
+
+        function showModal(title, desc) {
+            els.modalTitle.textContent = title;
+            els.modalDesc.textContent = desc;
+            els.modalIcon.textContent = "🎉";
+            els.modal.classList.remove('hidden');
+        }
+
+        function closeModal() { els.modal.classList.add('hidden'); }
+    </script>
+</body>
+</html>
